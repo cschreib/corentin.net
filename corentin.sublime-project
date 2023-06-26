@@ -2,7 +2,84 @@
 	"folders":
 	[
 		{
-			"path": "."
+			"path": ".",
 		}
-	]
+	],
+	"settings":
+	{
+		"cmake":
+		{
+		   "build_folder": "$folder/build",
+		},
+		"ClangFormat":
+		{
+		    "format_on_save": true,
+		},
+	},
+	"build_systems":
+	[
+		{
+			"config": "Default",
+			"env":
+			{
+			},
+			"generator": "Unix Makefiles",
+			"name": "Default",
+			"target": "cmake_build",
+			"variants":
+			[
+				{
+					"build_target": "md2html",
+					"name": "md2html"
+				},
+				{
+					"artifact": "_deps/md4c-build/md2html/md2html",
+					"build_target": "md2html",
+					"name": "Run: md2html",
+					"target": "cmake_run"
+				},
+				{
+					"artifact": "_deps/md4c-build/md2html/md2html",
+					"build_target": "md2html",
+					"debug": true,
+					"name": "Run under GDB: md2html",
+					"target": "cmake_run"
+				},
+				{
+					"build_target": "md4c",
+					"name": "md4c"
+				},
+				{
+					"build_target": "md4c-html",
+					"name": "md4c-html"
+				},
+				{
+					"build_target": "uninstall",
+					"name": "uninstall"
+				},
+				{
+					"build_target": "website",
+					"name": "website"
+				},
+				{
+					"artifact": "website",
+					"build_target": "website",
+					"name": "Run: website",
+					"target": "cmake_run"
+				},
+				{
+					"artifact": "website",
+					"build_target": "website",
+					"debug": true,
+					"name": "Run under GDB: website",
+					"target": "cmake_run"
+				},
+				{
+					"name": "ctest",
+					"target": "ctest_run"
+				}
+			],
+			"working_dir": "$folder/build"
+		}
+	],
 }

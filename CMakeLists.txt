@@ -21,7 +21,20 @@ endif()
 configure_file("${PROJECT_SOURCE_DIR}/include/website_config.hpp.config"
                "${PROJECT_BINARY_DIR}/website_config.hpp")
 
+# Uncomment to enable sanitizer (will need commenting out static standard libs below)
+# add_compile_options(-fsanitize=address)
+# add_link_options(-fsanitize=address)
+
 include(FetchContent)
+
+set(BUILD_SHARED_LIBS "No")
+
+FetchContent_Declare(md4c
+                     GIT_REPOSITORY https://github.com/mity/md4c.git
+                     GIT_TAG        release-0.4.8)
+FetchContent_MakeAvailable(md4c)
+
+set(MD4C_INCLUDE_DIR "${PROJECT_BINARY_DIR}/_deps/md4c-src/src")
 
 FetchContent_Declare(json
                      GIT_REPOSITORY https://github.com/nlohmann/json.git
@@ -37,15 +50,19 @@ set(ASIO_INCLUDE_DIR "${PROJECT_BINARY_DIR}/_deps/asio-src/asio/include")
 set(CROW_INSTALL "No")
 
 FetchContent_Declare(crow
-                     GIT_REPOSITORY https://github.com/CrowCpp/Crow.git
-                     GIT_TAG        b516efe0a2cce558a6121f29f0c586ec6462999e)
+                     GIT_REPOSITORY https://github.com/cschreib/Crow.git
+                     GIT_TAG        40898d716c9e0baa25b3ead15408277934cd70d0)
 FetchContent_MakeAvailable(crow)
 
 add_executable(website
+    ${PROJECT_SOURCE_DIR}/src/markdown.cpp
+    ${PROJECT_SOURCE_DIR}/src/html.cpp
+    ${PROJECT_SOURCE_DIR}/src/utility.cpp
     ${PROJECT_SOURCE_DIR}/src/main.cpp)
 
 target_compile_features(website PRIVATE cxx_std_23)
 target_include_directories(website PRIVATE
+    ${MD4C_INCLUDE_DIR}
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include>)
@@ -56,6 +73,7 @@ endif()
 
 target_link_libraries(website PRIVATE
     nlohmann_json::nlohmann_json
+    md4c-html
     Crow::Crow)
 
 target_link_libraries(website PRIVATE
