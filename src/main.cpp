@@ -30,8 +30,10 @@ int main() {
 
         // Markdown pages
         if (file_exists(file_url + ".md")) {
-            // return serve_markdown(req.url + ".md");
-            throw std::runtime_error("some error");
+            return serve_markdown(file_url + ".md");
+        }
+        if (file_exists(file_url + "index.md")) {
+            return serve_markdown(file_url + "index.md");
         }
 
         // Not found
