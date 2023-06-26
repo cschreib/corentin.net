@@ -12,7 +12,8 @@ int main() {
         try {
             throw;
         } catch (const std::exception& e) {
-            res = serve_markdown("500.md", {{"message", e.what()}});
+            res      = serve_markdown("500.md", {{"message", e.what()}});
+            res.code = crow::status::INTERNAL_SERVER_ERROR;
         }
     });
 
