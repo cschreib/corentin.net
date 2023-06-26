@@ -51,7 +51,7 @@ set(CROW_INSTALL "No")
 
 FetchContent_Declare(crow
                      GIT_REPOSITORY https://github.com/cschreib/Crow.git
-                     GIT_TAG        40898d716c9e0baa25b3ead15408277934cd70d0)
+                     GIT_TAG        089eadb6b27d055445ed62a9027a468d8609cf91)
 FetchContent_MakeAvailable(crow)
 
 add_executable(website
