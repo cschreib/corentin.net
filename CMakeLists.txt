@@ -29,12 +29,10 @@ include(FetchContent)
 
 set(BUILD_SHARED_LIBS "No")
 
-FetchContent_Declare(md4c
-                     GIT_REPOSITORY https://github.com/mity/md4c.git
-                     GIT_TAG        release-0.4.8)
-FetchContent_MakeAvailable(md4c)
-
-set(MD4C_INCLUDE_DIR "${PROJECT_BINARY_DIR}/_deps/md4c-src/src")
+FetchContent_Declare(lexy
+                     GIT_REPOSITORY https://github.com/foonathan/lexy.git
+                     GIT_TAG        v2022.12.1)
+FetchContent_MakeAvailable(lexy)
 
 FetchContent_Declare(json
                      GIT_REPOSITORY https://github.com/nlohmann/json.git
@@ -73,8 +71,8 @@ endif()
 
 target_link_libraries(website PRIVATE
     nlohmann_json::nlohmann_json
-    md4c-html
-    Crow::Crow)
+    Crow::Crow
+    foonathan::lexy)
 
 target_link_libraries(website PRIVATE
     -static -static-libgcc -static-libstdc++)
