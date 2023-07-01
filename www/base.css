@@ -1,0 +1,23 @@
+:root {
+  --bg: #000000;
+  --fg: #ffffff;
+}
+
+body {
+  color: var(--fg);
+  background-color: var(--bg);
+  max-width: 700px;
+  padding-top: 0.5em;
+  padding-left: 0.3em;
+  padding-right: 0.3em;
+  margin: auto;
+  line-height: 1.2;
+}
+
+.credits {
+  font-size: 70%;
+  display: block;
+  margin: auto;
+  text-align: center;
+  padding-top: 2em;
+}
