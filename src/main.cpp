@@ -23,7 +23,7 @@ int main() {
         const auto file_url = req.url.substr(1);
         const auto url      = std::string_view(file_url);
         if (url.ends_with(".css")) {
-            return serve_file(file_url);
+            return serve_css(file_url);
         } else if (url.ends_with(".png")) {
             return serve_file(file_url);
         }
