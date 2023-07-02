@@ -307,7 +307,7 @@ std::string to_html(const markdown::pass2::document& doc) {
 
                     for (std::size_t i = 0; i < p.size(); ++i) {
                         if (i != 0) {
-                            str << "\n";
+                            str << "<br/>\n";
                         }
                         html_escape(str, to_string(p[i]));
                     }
