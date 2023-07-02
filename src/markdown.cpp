@@ -16,6 +16,7 @@ namespace {
 namespace markdown {
 using string_view = std::u8string_view;
 
+namespace pass1 {
 struct heading {
     std::size_t level = 0;
     string_view name;
@@ -26,16 +27,38 @@ struct code_block {
     string_view                code;
 };
 
-struct line {
-    std::size_t quote_level = 0;
-    string_view content;
+using line = string_view;
+
+using entry_element = std::variant<heading, code_block, line>;
+
+struct entry {
+    std::size_t   quote_level = 0;
+    entry_element content;
 };
+
+using document = std::vector<entry>;
+} // namespace pass1
+
+namespace pass2 {
+using pass1::code_block;
+using pass1::heading;
+using pass1::line;
 
 using paragraph = std::vector<line>;
 
-using entry = std::variant<heading, code_block, paragraph>;
+struct increase_quote_level {
+    std::size_t amount = 0u;
+};
+
+struct decrease_quote_level {
+    std::size_t amount = 0u;
+};
+
+using entry =
+    std::variant<heading, code_block, increase_quote_level, decrease_quote_level, paragraph>;
 
 using document = std::vector<entry>;
+} // namespace pass2
 } // namespace markdown
 
 namespace markdown_grammar {
@@ -76,7 +99,7 @@ struct heading {
                 dsl::p<heading_name>);
     }();
 
-    static constexpr auto value = lexy::construct<markdown::heading>;
+    static constexpr auto value = lexy::construct<markdown::pass1::heading>;
 };
 
 struct code_language {
@@ -97,9 +120,9 @@ struct code_block {
                 dsl::capture(dsl::token(dsl::while_(dsl::peek_not(end) >> character))) + end);
     }();
 
-    static constexpr auto value = lexy::callback<markdown::code_block>(
+    static constexpr auto value = lexy::callback<markdown::pass1::code_block>(
         [](std::optional<markdown::string_view> lang, lexeme lex) {
-            return markdown::code_block{
+            return markdown::pass1::code_block{
                 lang, markdown::string_view(lex.begin(), lex.end() - lex.begin())};
         });
 };
@@ -117,41 +140,30 @@ struct line {
     static constexpr auto rule = []() {
         constexpr auto character = dsl::code_point;
         constexpr auto end       = line_sep | dsl::eof;
-        return dsl::peek_not(end) >>
-               (dsl::opt(dsl::p<quote_level>) + dsl::token(dsl::while_(dsl::ascii::blank)) +
-                dsl::capture(dsl::token(dsl::while_(dsl::peek_not(end) >> character))));
+        return dsl::capture(dsl::token(dsl::while_(dsl::peek_not(end) >> character)));
     }();
 
-    static constexpr auto value = lexy::callback<markdown::line>(
-        [](std::optional<std::size_t> quote_level, lexeme line_content) {
-            return markdown::line{
-                quote_level.value_or(0u),
-                markdown::string_view(
-                    line_content.begin(), line_content.end() - line_content.begin())};
-        });
-};
-
-struct paragraph {
-    static constexpr auto rule = []() {
-        constexpr auto character = dsl::code_point;
-        constexpr auto end =
-            dsl::token(dsl::times<2>(line_sep)) | dsl::token(line_sep + dsl::eof) | dsl::eof;
-        return dsl::peek_not(end) >> dsl::list(dsl::p<line>, dsl::trailing_sep(line_sep));
-    }();
-
-    static constexpr auto value = lexy::as_list<markdown::paragraph>;
+    static constexpr auto value = lexy::callback<markdown::pass1::line>([](lexeme line_content) {
+        return markdown::pass1::line{
+            markdown::string_view(line_content.begin(), line_content.end() - line_content.begin())};
+    });
 };
 
 struct entry {
-    static constexpr auto rule = dsl::p<heading> | dsl::p<code_block> | dsl::p<paragraph>;
+    static constexpr auto rule =
+        dsl::opt(dsl::p<quote_level>) + dsl::token(dsl::while_(dsl::ascii::blank)) +
+        (dsl::p<heading> | dsl::p<code_block> | (dsl::else_ >> dsl::p<line>));
 
-    static constexpr auto value = lexy::construct<markdown::entry>;
+    static constexpr auto value = lexy::callback<markdown::pass1::entry>(
+        [](std::optional<std::size_t> quote_level, markdown::pass1::entry_element elem) {
+            return markdown::pass1::entry{quote_level.value_or(0u), elem};
+        });
 };
 
 struct document {
-    static constexpr auto rule = dsl::list(line_sep | dsl::p<entry>) + dsl::eof;
+    static constexpr auto rule = dsl::list(dsl::p<entry>, dsl::sep(line_sep)) + dsl::eof;
 
-    static constexpr auto value = lexy::as_list<markdown::document>;
+    static constexpr auto value = lexy::as_list<markdown::pass1::document>;
 };
 } // namespace markdown_grammar
 
@@ -168,19 +180,85 @@ std::string_view to_string(std::u8string_view sv) {
     return {reinterpret_cast<const char*>(sv.begin()), sv.length()};
 }
 
-markdown::document parse(const std::string& md) {
+markdown::pass1::document lex(const std::string& md) {
     auto str = markdown_grammar::input(md);
+
+    // For debugging
     lexy::trace_to<markdown_grammar::document>(
         std::ostream_iterator<char>(std::cout), str, lexy_ext::report_error);
+
     auto res = lexy::parse<markdown_grammar::document>(str, lexy_ext::report_error);
     if (!res.has_value()) {
-        markdown::document doc;
-        doc.push_back(markdown::paragraph{
-            {markdown::line{0, markdown::string_view{str.data(), str.size()}}}});
+        markdown::pass1::document doc;
+        doc.push_back({0u, markdown::pass1::line{markdown::string_view{str.data(), str.size()}}});
         return doc;
     }
 
     return std::move(res.value());
+}
+
+markdown::pass2::document combine(const markdown::pass1::document& doc) {
+    markdown::pass2::document output;
+
+    markdown::pass2::paragraph* current_paragraph = nullptr;
+    std::size_t                 last_quote_level  = 0u;
+
+    auto flush_paragraph = [&]() {
+        if (!current_paragraph) {
+            return;
+        }
+
+        if (current_paragraph->empty()) {
+            output.pop_back();
+        }
+
+        current_paragraph = nullptr;
+    };
+
+    for (const auto& v : doc) {
+        if (v.quote_level > last_quote_level) {
+            flush_paragraph();
+            output.push_back(
+                markdown::pass2::increase_quote_level{v.quote_level - last_quote_level});
+        } else if (v.quote_level < last_quote_level) {
+            flush_paragraph();
+            output.push_back(
+                markdown::pass2::decrease_quote_level{last_quote_level - v.quote_level});
+        }
+
+        last_quote_level = v.quote_level;
+
+        std::visit(
+            overload{
+                [&](const markdown::pass1::line& l) {
+                    if (!current_paragraph && l.empty()) {
+                        return;
+                    }
+
+                    if (l.empty() || !current_paragraph) {
+                        // New paragraph
+                        output.push_back(markdown::pass2::paragraph{});
+                        current_paragraph = std::get_if<markdown::pass2::paragraph>(&output.back());
+                    }
+
+                    if (!l.empty()) {
+                        current_paragraph->push_back(l);
+                    }
+                },
+                [&](const auto& e) {
+                    flush_paragraph();
+                    output.push_back(e);
+                }},
+            v.content);
+    }
+
+    flush_paragraph();
+
+    return output;
+}
+
+markdown::pass2::document parse(const std::string& md) {
+    return combine(lex(md));
 }
 
 void html_escape(std::ostream& str, std::string_view content) {
@@ -189,18 +267,19 @@ void html_escape(std::ostream& str, std::string_view content) {
     str << content;
 }
 
-std::string to_html(const markdown::document& doc) {
+std::string to_html(const markdown::pass2::document& doc) {
     std::ostringstream str;
 
+    std::size_t last_quote_level = 0;
     for (const auto& ev : doc) {
         std::visit(
             overload{
-                [&](const markdown::heading& h) {
+                [&](const markdown::pass2::heading& h) {
                     str << "<h" << h.level << ">";
                     html_escape(str, to_string(h.name));
                     str << "</h" << h.level << ">\n";
                 },
-                [&](const markdown::code_block& cb) {
+                [&](const markdown::pass2::code_block& cb) {
                     str << "<pre>";
                     if (cb.language.has_value()) {
                         str << "<code class=\"";
@@ -212,46 +291,28 @@ std::string to_html(const markdown::document& doc) {
                     html_escape(str, to_string(cb.code));
                     str << "</code></pre>\n";
                 },
-                [&](const markdown::paragraph& p) {
-                    if (p.empty()) {
-                        return;
-                    }
-
-                    std::size_t last_quote_level = 0;
-                    while (p[0].quote_level > last_quote_level) {
+                [&](const markdown::pass2::increase_quote_level& q) {
+                    for (std::size_t i = 0u; i < q.amount; ++i) {
                         str << "<blockquote>";
-                        ++last_quote_level;
                     }
+                },
+                [&](const markdown::pass2::decrease_quote_level& q) {
+                    for (std::size_t i = 0u; i < q.amount; ++i) {
+                        str << "</blockquote>";
+                    }
+                    str << "\n";
+                },
+                [&](const markdown::pass2::paragraph& p) {
                     str << "<p>";
 
                     for (std::size_t i = 0; i < p.size(); ++i) {
                         if (i != 0) {
                             str << "\n";
                         }
-                        if (p[i].quote_level > last_quote_level) {
-                            str << "</p>\n";
-                            while (p[i].quote_level > last_quote_level) {
-                                str << "<blockquote>";
-                                ++last_quote_level;
-                            }
-                            str << "<p>";
-                        }
-                        if (p[i].quote_level < last_quote_level) {
-                            str << "</p>";
-                            while (p[i].quote_level < last_quote_level) {
-                                str << "</blockquote>";
-                                --last_quote_level;
-                            }
-                            str << "\n<p>";
-                        }
-                        html_escape(str, to_string(p[i].content));
+                        html_escape(str, to_string(p[i]));
                     }
 
                     str << "</p>";
-                    while (last_quote_level > 0) {
-                        str << "</blockquote>";
-                        --last_quote_level;
-                    }
                     str << "\n";
                 }},
             ev);
