@@ -1,9 +1,16 @@
 #include "html.hpp"
+#include "markdown.hpp"
 #include "utility.hpp"
 
 #include <crow/app.h>
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc > 1) {
+        std::cout << markdown2html(read_file(argv[1])) << std::endl;
+
+        return 0;
+    }
+
     crow::SimpleApp app;
 
     crow::logger::setLogLevel(crow::LogLevel::Debug);

@@ -1,6 +1,8 @@
 :root {
-  --bg: #000000;
-  --fg: #ffffff;
+  --bg-tone: #000000;
+  --fg-tone: #ffffff;
+  --bg: color(var(--bg-tone) blend(--fg-tone 25%));
+  --fg: color(var(--fg-tone) blend(--bg-tone 25%));
 }
 
 body {
